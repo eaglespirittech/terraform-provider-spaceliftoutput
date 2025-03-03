@@ -28,10 +28,7 @@ builds:
     binary: 'terraform-provider-spaceliftoutput_v{{ .Version }}'  # Fix binary naming
 
 archives:
-  - format: zip  # Ensure ZIP for all OS
-    format_overrides:
-      - goos: windows
-        formats: ["zip"]
+  - formats: ["zip"]  # Ensure ZIP for all OS
     name_template: 'terraform-provider-spaceliftoutput_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     files:
       - LICENSE*
