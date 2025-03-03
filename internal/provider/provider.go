@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -88,17 +89,21 @@ func (p *SpaceLiftOutputProvider) Schema(_ context.Context, _ provider.SchemaReq
 
 // Configure prepares a SpaceLift API client for data sources and resources.
 func (p *SpaceLiftOutputProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	tflog.Debug(ctx, "Configuring SpaceLift provider")
+
 	// Retrieve provider data from configuration
 	var config SpaceLiftOutputProviderModel
 	diags := req.Config.Get(ctx, &config)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Error retrieving provider configuration")
 		return
 	}
 
 	// If practitioner provided a configuration value for any of the
 	// attributes, it must be a known value.
 	if config.ApiToken.IsUnknown() {
+		tflog.Error(ctx, "Unknown SpaceLift API Token configuration")
 		resp.Diagnostics.AddAttributeError(
 			path.Root("api_token"),
 			"Unknown SpaceLift API Token",
@@ -108,6 +113,7 @@ func (p *SpaceLiftOutputProvider) Configure(ctx context.Context, req provider.Co
 	}
 
 	if config.ApiUrl.IsUnknown() {
+		tflog.Error(ctx, "Unknown SpaceLift API URL configuration")
 		resp.Diagnostics.AddAttributeError(
 			path.Root("api_url"),
 			"Unknown SpaceLift API URL",
@@ -117,6 +123,7 @@ func (p *SpaceLiftOutputProvider) Configure(ctx context.Context, req provider.Co
 	}
 
 	if config.AccountName.IsUnknown() {
+		tflog.Error(ctx, "Unknown Account Name configuration")
 		resp.Diagnostics.AddAttributeError(
 			path.Root("account_name"),
 			"Unknown Account Name",
@@ -143,27 +150,47 @@ func (p *SpaceLiftOutputProvider) Configure(ctx context.Context, req provider.Co
 	// If account name is not set in environment variables, use default
 	if accountName == "" {
 		accountName = "eaglespirittech"
+		tflog.Debug(ctx, "Using default account name", map[string]interface{}{
+			"account_name": accountName,
+		})
+	} else {
+		tflog.Debug(ctx, "Using account name from environment", map[string]interface{}{
+			"account_name": accountName,
+		})
 	}
 
 	// Override with configuration values if provided
 	if !config.ApiToken.IsNull() {
 		apiToken = config.ApiToken.ValueString()
+		tflog.Debug(ctx, "Using API token from configuration")
+	} else {
+		tflog.Debug(ctx, "Using API token from environment")
 	}
 
 	if !config.AccountName.IsNull() {
 		accountName = config.AccountName.ValueString()
+		tflog.Debug(ctx, "Using account name from configuration", map[string]interface{}{
+			"account_name": accountName,
+		})
 	}
 
 	if !config.ApiUrl.IsNull() {
 		apiUrl = config.ApiUrl.ValueString()
+		tflog.Debug(ctx, "Using API URL from configuration", map[string]interface{}{
+			"api_url": apiUrl,
+		})
 	} else {
 		// Construct the API URL using the account name
 		apiUrl = "https://" + accountName + ".app.spacelift.io/graphql"
+		tflog.Debug(ctx, "Constructed API URL", map[string]interface{}{
+			"api_url": apiUrl,
+		})
 	}
 
 	// If any of the expected configurations are missing, return
 	// errors with provider-specific guidance.
 	if apiToken == "" {
+		tflog.Error(ctx, "Missing SpaceLift API Token")
 		resp.Diagnostics.AddAttributeError(
 			path.Root("api_token"),
 			"Missing SpaceLift API Token",
@@ -171,15 +198,22 @@ func (p *SpaceLiftOutputProvider) Configure(ctx context.Context, req provider.Co
 				"Set the api_token value in the configuration or use the SPACELIFT_API_TOKEN environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
+	} else {
+		tflog.Debug(ctx, "SpaceLift API Token is set")
 	}
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	tflog.Debug(ctx, "Creating SpaceLift client")
+
 	// Create a new SpaceLift client using the configuration values
 	client, err := p.CreateClient(ctx, apiToken, apiUrl)
 	if err != nil {
+		tflog.Error(ctx, "Failed to create SpaceLift client", map[string]interface{}{
+			"error": err.Error(),
+		})
 		resp.Diagnostics.AddError(
 			"Unable to Create SpaceLift API Client",
 			"An unexpected error occurred when creating the SpaceLift API client. "+
@@ -188,6 +222,11 @@ func (p *SpaceLiftOutputProvider) Configure(ctx context.Context, req provider.Co
 		)
 		return
 	}
+
+	// Set the context in the client for logging
+	client.ctx = ctx
+
+	tflog.Debug(ctx, "Successfully configured SpaceLift provider")
 
 	// Make the SpaceLift client available during DataSource and Resource
 	// type Configure methods.
