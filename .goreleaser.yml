@@ -3,6 +3,7 @@ version: 2
 before:
   hooks:
     - go mod tidy
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -24,15 +25,23 @@ builds:
     ignore:
       - goos: darwin
         goarch: '386'
-    binary: '{{ .ProjectName }}_v{{ .Version }}'
+    binary: 'terraform-provider-spaceliftoutput_v{{ .Version }}'  # Fix binary naming
+
 archives:
-  - format_overrides:
-    - goos: windows
-      formats: ["zip"]
-    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+  - format: zip  # Ensure ZIP for all OS
+    format_overrides:
+      - goos: windows
+        formats: ["zip"]
+    name_template: 'terraform-provider-spaceliftoutput_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - LICENSE*
+      - README.md
+    wrap_in_directory: false  # Ensure no extra folder inside ZIP
+
 checksum:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
+  name_template: 'terraform-provider-spaceliftoutput_{{ .Version }}_SHA256SUMS'
   algorithm: sha256
+
 signs:
   - artifacts: checksum
     args:
@@ -43,11 +52,13 @@ signs:
       - "${signature}"
       - "--detach-sign"
       - "${artifact}"
+
 release:
   draft: false
+
 changelog:
   sort: asc
   filters:
     exclude:
       - '^docs:'
-      - '^test:' 
+      - '^test:'
