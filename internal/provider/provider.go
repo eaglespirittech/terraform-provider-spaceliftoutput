@@ -28,8 +28,8 @@ type SpaceLiftOutputProvider struct {
 
 // SpaceLiftOutputProviderModel describes the provider data model.
 type SpaceLiftOutputProviderModel struct {
-	ApiToken   types.String `tfsdk:"api_token"`
-	ApiUrl     types.String `tfsdk:"api_url"`
+	ApiToken    types.String `tfsdk:"api_token"`
+	ApiUrl      types.String `tfsdk:"api_url"`
 	AccountName types.String `tfsdk:"account_name"`
 }
 
@@ -48,12 +48,12 @@ func New(version string, opts ...ProviderOption) func() provider.Provider {
 				}, nil
 			},
 		}
-		
+
 		// Apply options
 		for _, opt := range opts {
 			opt(p)
 		}
-		
+
 		return p
 	}
 }
@@ -79,7 +79,7 @@ func (p *SpaceLiftOutputProvider) Schema(_ context.Context, _ provider.SchemaReq
 				Optional:    true,
 			},
 			"account_name": schema.StringAttribute{
-				Description: "Your account name in Spacelift. Used to construct the API URL if api_url is not specified. Can also be set with the spacelift_account_name environment variable.",
+				Description: "Your account name in Spacelift. Used to construct the API URL if api_url is not specified. Can also be set with the TF_VAR_spacelift_account_name or spacelift_account_name environment variables.",
 				Optional:    true,
 			},
 		},
@@ -133,13 +133,19 @@ func (p *SpaceLiftOutputProvider) Configure(ctx context.Context, req provider.Co
 	// with Terraform configuration value if set.
 	apiToken := os.Getenv("SPACELIFT_API_TOKEN")
 	var apiUrl string
-	accountName := os.Getenv("spacelift_account_name")
-	
-	// If account name is not set in environment variable, use default
+
+	// First check TF_VAR_spacelift_account_name, then fallback to spacelift_account_name
+	accountName := os.Getenv("TF_VAR_spacelift_account_name")
+	if accountName == "" {
+		accountName = os.Getenv("spacelift_account_name")
+	}
+
+	// If account name is not set in environment variables, use default
 	if accountName == "" {
 		accountName = "eaglespirittech"
 	}
 
+	// Override with configuration values if provided
 	if !config.ApiToken.IsNull() {
 		apiToken = config.ApiToken.ValueString()
 	}
@@ -200,4 +206,4 @@ func (p *SpaceLiftOutputProvider) DataSources(_ context.Context) []func() dataso
 // Resources defines the resources implemented in the provider.
 func (p *SpaceLiftOutputProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{}
-} 
+}
